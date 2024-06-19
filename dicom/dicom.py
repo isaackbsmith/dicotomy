@@ -12,27 +12,25 @@ from typing import Literal
 class DICOM:
     """
     attributes:
-        file_path (string): DICOM file path
-        pixel_array (np.ndarray): A numpy.ndarray containing the pixel data
+        path (string): DICOM file/directory path
+        dcm_files (Path[]): An array containing the dicom file(s) paths
 
     methods:
         process_static():
-            Processes the DICOM pixel array and returns an 8-bit representation.
+            Processes the DICOM pixel array, exports the files as images
+            and returns an 8-bit representation.
 
         process_dynamic():
-            Processes the DICOM pixel array and returns an 8-bit representation.
-
-        plot_image():
-            Plots the pixel array using matplotlib
-
-        export_image():
-            Exports the processed pixel array to a JPEG or PNG image
+            Processes the DICOM pixel array, exports the files as images
+            and returns an 8-bit representation. The contrast of the resulting
+            image can be modified by passing in the min and max Hounsfield unit
+            values.
     """
 
     def __init__(self, path: str) -> None:
 
         self.path = Path(path)
-        self.dcm_files = []
+        self.dcm_files: list[Path] = []
 
         if not self.path.exists():
             raise FileNotFoundError("File/Folder does not exist")
@@ -41,7 +39,6 @@ class DICOM:
             self.dcm_files.append(self.path)
         else:
             self.dcm_files.extend(self.path.glob("*.dcm"))
-        
 
     def process_static(self,
                        output_dir: str,
@@ -105,8 +102,8 @@ class DICOM:
 
     def process_dynamic(self,
                         output_dir: str,
-                        min_v: int | None = None,
-                        max_v: int | None = None,
+                        min_p: int | None = None,
+                        max_p: int | None = None,
                         output_format: Literal["png", "jpg"] = "png",
                         plot: bool = False
                         ) -> list[np.uint8]:
@@ -114,12 +111,12 @@ class DICOM:
         Processes a DICOM pixel array by normalizing
         and converting to 8-bit unsigned integer format
         while allowing for the dynamic control of the
-        minimum and maximum voxel intensities
+        minimum and maximum pixel intensities
 
         parameters:
             output_dir (string): Output directory 
-            min_v (integer or nil): Minimum Hounsfield Unit
-            max_v (integer or nil): Maximum Hounsfield Unit
+            min_p (integer or nil): Minimum Hounsfield Unit
+            max_p (integer or nil): Maximum Hounsfield Unit
             output_format (jpg or png): Image format to export to
             plot (boolean): Flag to plot image or not
         returns:
@@ -143,14 +140,14 @@ class DICOM:
 
             pixel_array = dcm_file.pixel_array
 
-            # Determine the minimum and maximum Hounsfield Unit values
-            if min_v: hounsfield_min = min_v
+            # Determine the minimum and maximum Hounsfield Unit pixel values
+            if min_p: hounsfield_min = min_p
             hounsfield_min = np.min(pixel_array)
 
-            if max_v: hounsfield_max = max_v
+            if max_p: hounsfield_max = max_p
             hounsfield_max = np.max(pixel_array)
 
-            # Find the range of the values
+            # Find the range of the values in the pixel array
             hounsfield_range = hounsfield_max - hounsfield_min
 
             # Clip the pixel values to ensure they fall between the HU range
@@ -173,7 +170,7 @@ class DICOM:
 
     def _export(self,
                pixel_data_u8: np.uint8,
-               file: str,
+               file: Path,
                output_dir: Path,
                format: Literal["jpg", "png"],
                plot: bool = False) -> None:
@@ -194,10 +191,10 @@ class DICOM:
         if plot:
             plt.imshow(pixel_data_u8, cmap=mpl.colormaps["gray"])
             Path(output_dir.joinpath("plt/")).mkdir(parents=True, exist_ok=True)
-            plt.savefig(f"{output_dir}/plt/{Path(file).stem}.{"jpg" if format == "jpg" else "png"}")
+            plt.savefig(f"{output_dir}/plt/{file.stem}.{"jpg" if format == "jpg" else "png"}")
         else:
             image = Image.fromarray(pixel_data_u8)
             Path(output_dir.joinpath("img/")).mkdir(parents=True, exist_ok=True)
-            image.save(f"{output_dir}/img/{Path(file).stem}.{"jpg" if format == "jpg" else "png"}")
+            image.save(f"{output_dir}/img/{file.stem}.{"jpg" if format == "jpg" else "png"}")
 
 
